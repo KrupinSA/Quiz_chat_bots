@@ -4,7 +4,7 @@ import re
 import random
 import logging
 from dotenv import load_dotenv
-from telegram import Update
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 
@@ -84,6 +84,14 @@ def echo(update: Update, context: CallbackContext) -> None:
     """Echo the user message."""
     update.message.reply_text(update.message.text)
 
+def add_menu(bot):
+    custom_keyboard = [['Новый вопрос', 'Сдаться'], 
+                   ['Мой счет']]
+    reply_markup = ReplyKeyboardMarkup(custom_keyboard)
+    bot.send_message(chat_id=TELEGRAM_CHAT_ID, 
+                 text="Привет я бот для викторины", 
+                 reply_markup=reply_markup)
+
 def main():
     load_dotenv()
     global TELEGRAM_TOKEN
@@ -103,6 +111,7 @@ def main():
     logger.addHandler(telegram_handler)
 
     dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
+    add_menu(updater.bot)
     updater.start_polling()
     updater.idle()
 
