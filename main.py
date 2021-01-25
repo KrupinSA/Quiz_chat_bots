@@ -16,6 +16,7 @@ TELEGRAM_CHAT_ID = ""
 REDIS_HOST = ""
 REDIS_PORT = ""
 REDIS_PASS = ""
+REDIS_DB = ""
 
 logger = logging.getLogger(__name__)
 
@@ -78,25 +79,28 @@ def get_current_quiz() -> list:
 
 def send_message() -> None:
     def send_wrapped_message(update: Update, context: CallbackContext) -> None:
-        if update.message.text == "Новый вопрос":
+        user_id = update.message['from_user']['id']
+        answer = send_wrapped_message.redis_db.get(user_id).decode('UTF-8')
+        if answer.split(".")[0] == update.message.text:
+            update.message.reply_text("Правильно! Поздравляю! Для следующего вопроса нажми 'Новый вопрос'.")
+        elif update.message.text == "Новый вопрос":
             if send_wrapped_message.current_quiz:
                 try:
                     stage = next(send_wrapped_message.current_quiz)
                     update.message.reply_text(stage['question'])
-                    return
+                    send_wrapped_message.redis_db.set(user_id, stage['answer'])
                 except StopIteration:
                     update.message.reply_text('Викторина закончена')
-                    return
-        if update.message.text == "Новая викторина":
+        elif update.message.text == "Новая викторина":
             send_wrapped_message.current_quiz = iter(get_current_quiz()) 
             try:
                 stage = next(send_wrapped_message.current_quiz)
                 update.message.reply_text(stage['question'])
-                return
             except StopIteration:
                 update.message.reply_text('Викторина закончена')
-                return
-        update.message.reply_text(update.message.text)
+        else: 
+            update.message.reply_text("Неправильно… Попробуешь ещё раз?")
+    send_wrapped_message.redis_db = redis.Redis(host=REDIS_HOST,port=int(REDIS_PORT), password=REDIS_PASS, db=0)
     send_wrapped_message.current_quiz = iter(get_current_quiz()) 
     return send_wrapped_message
 
@@ -122,6 +126,8 @@ def main():
     REDIS_HOST = os.getenv("REDIS_HOST")
     global REDIS_PORT
     REDIS_PORT = os.getenv('REDIS_PORT')
+    global REDIS_DB
+    REDIS_DB = os.getenv('REDIS_DB')
     global REDIS_PASS
     REDIS_PASS = os.getenv('REDIS_PASS')
 
