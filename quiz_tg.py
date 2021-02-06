@@ -8,7 +8,7 @@ from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext,  ConversationHandler
 import redis
 from enum import Enum
-from general import TelegramLogsHandler
+from general import TelegramLogsHandler, get_current_quiz
 
 
 
@@ -22,58 +22,6 @@ REDIS_DB = ""
 Marker = Enum('Marker', 'CHOOSING TYPING_ANSWER')
 
 logger = logging.getLogger(__name__)
-
-
-
-def get_file_names_from_archive():
-    with zipfile.ZipFile(ZIP_FILE_NAME, 'r') as zip_file:
-        return [a_file.filename for a_file in zip_file.filelist if a_file.filename.endswith('txt')]
-
-
-def get_text_from_archive(file_name_in_zip=None):    
-    if not file_name_in_zip:
-        files_in_archive = get_file_names_from_archive()
-        file_name_in_zip = random.choice(files_in_archive)
-    with zipfile.ZipFile(ZIP_FILE_NAME, 'r') as zip_file:
-        return zip_file.read(file_name_in_zip).decode('KOI8-R')
-
-
-def get_question_and_answer(quiz_text):
-    question_blocks = quiz_text.split('\n\n')
-    quiz_iterator = iter(question_blocks)
-    try:
-        while True:
-            item_value = next(quiz_iterator)
-            if item_value.startswith('Вопрос '):
-                question = item_value.split(':', 1)[1]
-                item_value = next(quiz_iterator)
-                if item_value.startswith('Ответ:'):
-                    answer = item_value.split(':', 1)[1]
-                    yield question, answer
-    except StopIteration:
-        return
-
-
-def get_current_quiz() -> list:
-    """
-    questions_and_answers = [
-        {
-            "question": "This example question ...",
-            "answer": "This example answer ..."
-        },
-        {
-            ...
-        }
-    ]
-    """
-    questions_and_answers = [
-        {
-            'question': question,
-            'answer': answer
-        } for question, answer in get_question_and_answer(get_text_from_archive())
-    ]
-    return questions_and_answers
-
 
 def handle_new_question_request(update: Update, context: CallbackContext) -> int:
     user_id = update.message['from_user']['id']
@@ -128,7 +76,7 @@ def start_quiz(update: Update, context: CallbackContext) -> int:
         context.user_data['redis']
     except KeyError:
         context.user_data['redis'] = redis.Redis(host=REDIS_HOST,port=int(REDIS_PORT), password=REDIS_PASS, db=0)
-    context.user_data['quiz'] = iter(get_current_quiz())
+    context.user_data['quiz'] = iter(get_current_quiz(ZIP_FILE_NAME))
     context.user_data['account'] = 0 
     custom_keyboard = [['Новый вопрос', 'Сдаться'], 
                    ['Мой счет', 'Закончить игру']]
