@@ -15,10 +15,13 @@ logger = logging.getLogger(__name__)
 
 class Quiz():
     def __init__(self, question):
-        self.question = question
+        self.question = iter(question)
 
     def __call__(self):
-        pass
+        try:
+            return next(self.question)
+        except StopIteration as si:
+            raise StopIteration(si)
 
 
 def echo(event, vk_api):
@@ -58,6 +61,15 @@ def finish_game(event, vk_api):
         message='Игра закончена'
     )
 
+def new_question(event, vk_api, quiz):
+    keyboard = create_keyboard()
+    vk_api.messages.send(
+        user_id=event.user_id,
+        random_id=get_random_id(),
+        keyboard=keyboard.get_keyboard(),
+        message=quiz()['question']
+    )
+
 def main():
     load_dotenv()
     quiz = None
@@ -78,6 +90,12 @@ def main():
                 if event.text == 'Закончить игру':
                     quiz = None
                     finish_game(event, vk_api)
+                elif event.text == 'Новый вопрос':
+                    try:
+                        new_question(event, vk_api, quiz)
+                    except StopIteration:
+                        quiz = None
+                        finish_game(event, vk_api)
             if event.text == '/quiz':
                 quiz = create_quiz(event, vk_api)
 
